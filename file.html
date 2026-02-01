@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mappa Segherie e Carpenterie in Legno con Filtri</title>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    #container {
+      display: flex;
+      height: 100%;
+    }
+
+    #sidebar {
+      width: 310px;
+      background: #f7f7f7;
+      overflow-y: auto;
+      border-right: 2px solid #ccc;
+      padding: 10px;
+    }
+
+    #sidebar h2 {
+      text-align: center;
+      margin: 10px 0;
+    }
+
+    #filters {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #filters label {
+      display: block;
+      margin: 5px 0;
+      cursor: pointer;
+    }
+
+    #results {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    #results li {
+      border-bottom: 1px solid #ddd;
+      padding: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    #results li:hover {
+      background: #e3f2fd;
+    }
+
+    #map {
+      flex: 1;
+    }
+
+    #controls {
+      background: #fff;
+      padding: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      z-index: 5;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      border-radius: 8px;
+    }
+
+    input[type="text"] {
+      width: 250px;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 8px 14px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+
+  <div id="controls">
+    <input id="localita" type="text" placeholder="Inserisci una città o zona..." />
+    <button onclick="cercaLocalita()">Cerca</button>
+  </div>
+
+  <div id="container">
+    <div id="sidebar">
+      <h2>Risultati</h2>
+
+      <!-- 🎚️ FILTRI -->
+      <div id="filters">
+        <label><input type="checkbox" id="filt-segherie" checked onchange="toggleCategoria('segheria')"> 🪚 Segherie</label>
+        <label><input type="checkbox" id="filt-carpenterie" checked onchange="toggleCategoria('carpenteria')"> 🧰 Carpenterie in legno</label>
+        <label><input type="checkbox" id="filt-commercianti" checked onchange="toggleCategoria('commerciante')"> 🪵 Commercianti di legno</label>
+      </div>
+
+      <!-- Lista risultati -->
+      <ul id="results"></ul>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+  <script>
+    let map, geocoder, service, infowindow;
+    let markers = { segheria: [], carpenteria: [], commerciante: [] };
+    let elenco = document.getElementById("results");
+
+    const icone = {
+      segheria: "https://maps.gstatic.com/mapfiles/ms2/micons/brown.png",
+      carpenteria: "https://maps.gstatic.com/mapfiles/ms2/micons/blue.png",
+      commerciante: "https://maps.gstatic.com/mapfiles/ms2/micons/green.png"
+    };
+
+    function initMap() {
+      const posizioneDefault = { lat: 45.4642, lng: 9.19 }; // Milano
+      map = new google.maps.Map(document.getElementById("map"), {
+        center: posizioneDefault,
+        zoom: 12,
+      });
+      geocoder = new google.maps.Geocoder();
+      infowindow = new google.maps.InfoWindow();
+      service = new google.maps.places.PlacesService(map);
+    }
+
+    function cercaLocalita() {
+      const luogo = document.getElementById("localita").value.trim();
+      if (!luogo) {
+        alert("Inserisci una località prima di cercare!");
+        return;
+      }
+
+      geocoder.geocode({ address: luogo }, (results, status) => {
+        if (status === "OK" && results[0]) {
+          const posizione = results[0].geometry.location;
+          map.setCenter(posizione);
+          map.setZoom(13);
+          pulisciMappa();
+
+          const richieste = [
+            { query: "segheria vicino a " + luogo, tipo: "segheria" },
+            { query: "carpenteria in legno vicino a " + luogo, tipo: "carpenteria" },
+            { query: "commerciante legno vicino a " + luogo, tipo: "commerciante" }
+          ];
+
+          richieste.forEach(richiesta => {
+            const request = { query: richiesta.query, fields: ["name", "geometry", "formatted_address"] };
+            service.textSearch(request, (results, status) => callback(results, status, richiesta.tipo));
+          });
+
+        } else {
+          alert("Località non trovata. Riprova.");
+        }
+      });
+    }
+
+    function pulisciMappa() {
+      Object.keys(markers).forEach(tipo => {
+        markers[tipo].forEach(m => m.setMap(null));
+        markers[tipo] = [];
+      });
+      elenco.innerHTML = "";
+    }
+
+    function callback(results, status, tipo) {
+      if (status === google.maps.places.PlacesServiceStatus.OK) {
+        results.forEach(place => creaMarker(place, tipo));
+      }
+    }
+
+    function creaMarker(place, tipo) {
+      if (!place.geometry || !place.geometry.location) return;
+
+      const marker = new google.maps.Marker({
+        map,
+        position: place.geometry.location,
+        icon: icone[tipo],
+        title: place.name,
+        categoria: tipo
+      });
+
+      markers[tipo].push(marker);
+
+      google.maps.event.addListener(marker, "click", () => {
+        infowindow.setContent(`
+          <div style="min-width:200px">
+            <h3 style="margin-top:0;">${place.name}</h3>
+            <p><strong>Categoria:</strong> ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</p>
+            ${place.formatted_address ? `<p>${place.formatted_address}</p>` : ""}
+          </div>
+        `);
+        infowindow.open(map, marker);
+      });
+
+      aggiungiAllaLista(place, tipo, marker);
+    }
+
+    function aggiungiAllaLista(place, tipo, marker) {
+      const li = document.createElement("li");
+      li.setAttribute("data-tipo", tipo);
+      li.innerHTML = `
+        <strong>${place.name}</strong><br>
+        <em>${tipo.charAt(0).toUpperCase() + tipo.slice(1)}</em><br>
+        ${place.formatted_address || ""}
+      `;
+      li.addEventListener("click", () => {
+        map.panTo(marker.getPosition());
+        map.setZoom(15);
+        new google.maps.event.trigger(marker, "click");
+      });
+      elenco.appendChild(li);
+    }
+
+    function toggleCategoria(tipo) {
+      const visibile = document.getElementById(
+        tipo === "segheria" ? "filt-segherie" :
+        tipo === "carpenteria" ? "filt-carpenterie" :
+        "filt-commercianti"
+      ).checked;
+
+      markers[tipo].forEach(marker => marker.setMap(visibile ? map : null));
+
+      // toggle nella lista
+      document.querySelectorAll(`#results li[data-tipo="${tipo}"]`)
+        .forEach(li => li.style.display = visibile ? "block" : "none");
+    }
+  </script>
+
+  <!-- 🔑 INSERISCI QUI LA TUA API KEY -->
+  <script async
+    src="https://maps.googleapis.com/maps/api/js?key=LA_TUA_API_KEY&libraries=places&callback=initMap">
+  </script>
+
+</body>
+</html>
