@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mappa Segherie e Carpenterie (OpenStreetMap)</title>
+
+  <!-- Fogli di stile Leaflet -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-sA+4gg1LpN8Bv+gZUCW+6zlEIX4NUyM08YQ2qF4QkPc="
+    crossorigin=""
+  />
+  <style>
+    html, body { height:100%; margin:0; }
+    #map { height:100%; width:100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Libreria Leaflet -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-o9N1j8Mk3GkIQV2bIxCeeQp49EDuC0wl5v+ZjN+socA="
+    crossorigin="">
+  </script>
+
+  <script>
+    // Mappa centrata su Milano
+    const map = L.map('map').setView([45.4642, 9.19], 12);
+
+    // Aggiunge la base OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Esempio di marker statici (puoi aggiungerne quanti vuoi)
+    const luoghi = [
+      { nome: "Segheria Rossi", lat: 45.47, lon: 9.18, tipo: "Segheria" },
+      { nome: "Carpenteria Legno Artigiana", lat: 45.46, lon: 9.20, tipo: "Carpenteria" },
+      { nome: "Commercio Legnami Verdi", lat: 45.45, lon: 9.22, tipo: "Commerciante" }
+    ];
+
+    luoghi.forEach(luogo => {
+      L.marker([luogo.lat, luogo.lon])
+        .addTo(map)
+        .bindPopup(`<strong>${luogo.nome}</strong><br>${luogo.tipo}`);
+    });
+  </script>
+</body>
+</html>
